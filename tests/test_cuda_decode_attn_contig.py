@@ -2,13 +2,13 @@ import pytest
 import torch
 
 import focal
-from focal.ops import cuda_extension_available
+from focal.cuda_extension import cuda_extension_available
 
 
 pytestmark = pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is unavailable")
 
 
-def _require_extension():
+def require_extension_or_skip():
     if not cuda_extension_available():
         pytest.skip("focal CUDA extension is not built")
 
@@ -22,8 +22,8 @@ def _require_extension():
         (1, 4, 2, 128, 1, [1], 3.0),
     ],
 )
-def test_cuda_decode_attn_contig_matches_reference(B, Hq, Hkv, D, L, seq_lens, qk_scale):
-    _require_extension()
+def test_cuda_decode_attn_contig_matches_pytorch(B, Hq, Hkv, D, L, seq_lens, qk_scale):
+    require_extension_or_skip()
     torch.manual_seed(2024)
     q = torch.randn((B, Hq, D), device="cuda", dtype=torch.float16) * qk_scale
     k = torch.randn((B, Hkv, L, D), device="cuda", dtype=torch.float16) * qk_scale
@@ -31,7 +31,7 @@ def test_cuda_decode_attn_contig_matches_reference(B, Hq, Hkv, D, L, seq_lens, q
     seq_lens_t = torch.tensor(seq_lens, device="cuda", dtype=torch.int32)
 
     got = focal.decode_attn_contig(q, k, v, seq_lens_t)
-    expected = focal.ref_decode_attn_contig(q, k, v, seq_lens_t)
+    expected = focal.pytorch_decode_attn_contig(q, k, v, seq_lens_t)
     torch.cuda.synchronize()
 
     assert torch.isfinite(got).all()
@@ -62,7 +62,7 @@ def test_cuda_decode_attn_contig_matches_reference(B, Hq, Hkv, D, L, seq_lens, q
     ],
 )
 def test_cuda_decode_attn_contig_rejects_invalid_contracts(case, error):
-    _require_extension()
+    require_extension_or_skip()
     q = torch.empty((1, 4, 128), device="cuda", dtype=torch.float16)
     k = torch.empty((1, 2, 5, 128), device="cuda", dtype=torch.float16)
     v = torch.empty((1, 2, 5, 128), device="cuda", dtype=torch.float16)

@@ -3,10 +3,10 @@ import math
 import pytest
 import torch
 
-from focal import ref_decode_attn_contig
+from focal import pytorch_decode_attn_contig
 
 
-def _expected_decode(q, k, v, seq_lens, sm_scale=None):
+def expected_decode(q, k, v, seq_lens, sm_scale=None):
     B, Hq, D = q.shape
     Hkv = k.shape[1]
     group_size = Hq // Hkv
@@ -47,7 +47,7 @@ def _expected_decode(q, k, v, seq_lens, sm_scale=None):
         ((2, 8, 2, 16, 7), [7, 3]),
     ],
 )
-def test_reference_matches_expected_cpu(shape, seq_lens):
+def test_pytorch_decode_attn_matches_expected(shape, seq_lens):
     B, Hq, Hkv, D, L = shape
     torch.manual_seed(123)
     q = torch.randn((B, Hq, D), dtype=torch.float32)
@@ -55,43 +55,43 @@ def test_reference_matches_expected_cpu(shape, seq_lens):
     v = torch.randn((B, Hkv, L, D), dtype=torch.float32)
     seq_lens_t = torch.tensor(seq_lens, dtype=torch.int64)
 
-    got = ref_decode_attn_contig(q, k, v, seq_lens_t)
-    expected = _expected_decode(q, k, v, seq_lens_t)
+    got = pytorch_decode_attn_contig(q, k, v, seq_lens_t)
+    expected = expected_decode(q, k, v, seq_lens_t)
 
     torch.testing.assert_close(got, expected, rtol=1e-5, atol=1e-6)
 
 
-def test_reference_returns_q_dtype_cpu():
+def test_pytorch_decode_attn_returns_q_dtype():
     q = torch.randn((1, 4, 8), dtype=torch.float16)
     k = torch.randn((1, 2, 5, 8), dtype=torch.float16)
     v = torch.randn((1, 2, 5, 8), dtype=torch.float16)
     seq_lens = torch.tensor([4], dtype=torch.int32)
 
-    out = ref_decode_attn_contig(q, k, v, seq_lens)
+    out = pytorch_decode_attn_contig(q, k, v, seq_lens)
 
     assert out.dtype == q.dtype
     assert out.shape == q.shape
 
 
-def test_reference_allows_zero_length_cpu():
+def test_pytorch_decode_attn_allows_zero_length():
     q = torch.randn((1, 4, 8), dtype=torch.float32)
     k = torch.randn((1, 2, 5, 8), dtype=torch.float32)
     v = torch.randn((1, 2, 5, 8), dtype=torch.float32)
     seq_lens = torch.tensor([0], dtype=torch.int32)
 
-    out = ref_decode_attn_contig(q, k, v, seq_lens)
+    out = pytorch_decode_attn_contig(q, k, v, seq_lens)
 
     assert torch.count_nonzero(out) == 0
 
 
-def test_reference_rejects_nonfinite_scale():
+def test_pytorch_decode_attn_rejects_nonfinite_scale():
     q = torch.randn((1, 4, 8), dtype=torch.float32)
     k = torch.randn((1, 2, 5, 8), dtype=torch.float32)
     v = torch.randn((1, 2, 5, 8), dtype=torch.float32)
     seq_lens = torch.tensor([5], dtype=torch.int32)
 
     with pytest.raises(ValueError, match="sm_scale must be finite"):
-        ref_decode_attn_contig(q, k, v, seq_lens, sm_scale=float("inf"))
+        pytorch_decode_attn_contig(q, k, v, seq_lens, sm_scale=float("inf"))
 
 
 @pytest.mark.parametrize(
@@ -148,6 +148,6 @@ def test_reference_rejects_nonfinite_scale():
         ),
     ],
 )
-def test_reference_validation_errors(q, k, v, seq_lens, error):
+def test_pytorch_decode_attn_validation_errors(q, k, v, seq_lens, error):
     with pytest.raises((TypeError, ValueError), match=error):
-        ref_decode_attn_contig(q, k, v, seq_lens)
+        pytorch_decode_attn_contig(q, k, v, seq_lens)

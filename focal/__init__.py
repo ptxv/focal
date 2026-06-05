@@ -1,4 +1,4 @@
-from .ops import decode_attn_contig
-from .reference import ref_decode_attn_contig
+from .decode_attention import decode_attn_contig
+from .references import pytorch_decode_attn_contig
 
-__all__ = ["decode_attn_contig", "ref_decode_attn_contig"]
+__all__ = ["decode_attn_contig", "pytorch_decode_attn_contig"]

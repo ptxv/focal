@@ -168,29 +168,6 @@ void check_int_size(const char* name, int64_t value) {
     TORCH_CHECK(value <= std::numeric_limits<int>::max(), name, " must fit in int32 for CUDA kernel v1");
 }
 
-void check_out(const torch::Tensor& out, const torch::Tensor& q) {
-    CHECK_CUDA(out);
-    CHECK_CONTIGUOUS(out);
-    CHECK_HALF(out);
-    TORCH_CHECK(out.dim() == 3, "out must have rank 3 [B, Hq, D]");
-    TORCH_CHECK(out.device() == q.device(), "out must be on the same CUDA device as q");
-    TORCH_CHECK(out.size(0) == q.size(0), "out batch dimension must match q");
-    TORCH_CHECK(out.size(1) == q.size(1), "out Hq dimension must match q");
-    TORCH_CHECK(out.size(2) == q.size(2), "out head dimension must match q");
-}
-
-void check_no_output_alias(
-    const torch::Tensor& q,
-    const torch::Tensor& k,
-    const torch::Tensor& v,
-    const torch::Tensor& seq_lens,
-    const torch::Tensor& out) {
-    TORCH_CHECK(!out.is_alias_of(q), "out must not alias q");
-    TORCH_CHECK(!out.is_alias_of(k), "out must not alias k");
-    TORCH_CHECK(!out.is_alias_of(v), "out must not alias v");
-    TORCH_CHECK(!out.is_alias_of(seq_lens), "out must not alias seq_lens");
-}
-
 void launch_decode_attn_contig(
     const torch::Tensor& q,
     const torch::Tensor& k,
@@ -199,8 +176,6 @@ void launch_decode_attn_contig(
     torch::Tensor& out,
     double sm_scale) {
     check_common(q, k, v, seq_lens);
-    check_out(out, q);
-    check_no_output_alias(q, k, v, seq_lens, out);
     TORCH_CHECK(std::isfinite(sm_scale), "sm_scale must be finite");
 
     c10::cuda::CUDAGuard device_guard(q.device());
@@ -253,18 +228,6 @@ torch::Tensor decode_attn_contig_cuda(
     torch::Tensor seq_lens,
     double sm_scale) {
     auto out = torch::empty_like(q);
-    launch_decode_attn_contig(q, k, v, seq_lens, out, sm_scale);
-    return out;
-}
-
-
-torch::Tensor decode_attn_contig_out_cuda(
-    torch::Tensor q,
-    torch::Tensor k,
-    torch::Tensor v,
-    torch::Tensor seq_lens,
-    torch::Tensor out,
-    double sm_scale) {
     launch_decode_attn_contig(q, k, v, seq_lens, out, sm_scale);
     return out;
 }

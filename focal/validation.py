@@ -5,7 +5,7 @@ import torch
 
 CUDA_HEAD_DIM = 128
 
-_INTEGER_DTYPES = {
+INTEGER_DTYPES = {
     torch.int8,
     torch.int16,
     torch.int32,
@@ -22,7 +22,7 @@ def default_sm_scale(D, sm_scale):
     return scale
 
 
-def _check_seq_lens_values(seq_lens, L):
+def check_seq_lens_values(seq_lens, L):
     # Length values guard K/V bounds; on CUDA this is a deliberate sync.
     seq_lens_i64 = seq_lens.to(dtype=torch.int64)
     if bool((seq_lens_i64 < 0).any().item()):
@@ -78,7 +78,7 @@ def validate_decode_attn_inputs(q, k, v, seq_lens, *, check_lengths=True):
 
     if seq_lens.dim() != 1 or seq_lens.shape[0] != B:
         raise ValueError(f"seq_lens must have shape [B], got {tuple(seq_lens.shape)}")
-    if seq_lens.dtype not in _INTEGER_DTYPES:
+    if seq_lens.dtype not in INTEGER_DTYPES:
         raise TypeError("seq_lens must have an integer dtype")
 
     devices = {q.device, k.device, v.device, seq_lens.device}
@@ -86,7 +86,7 @@ def validate_decode_attn_inputs(q, k, v, seq_lens, *, check_lengths=True):
         raise ValueError("q, k, v, and seq_lens must be on the same device")
 
     if check_lengths:
-        _check_seq_lens_values(seq_lens, L)
+        check_seq_lens_values(seq_lens, L)
 
     return B, Hq, Hkv, L, D
 
@@ -122,6 +122,6 @@ def validate_decode_attn_cuda_inputs(q, k, v, seq_lens, out=None, *, check_lengt
             raise ValueError(f"out must have shape {(B, Hq, D)}, got {tuple(out.shape)}")
 
     if check_lengths:
-        _check_seq_lens_values(seq_lens, L)
+        check_seq_lens_values(seq_lens, L)
 
     return B, Hq, Hkv, L, D

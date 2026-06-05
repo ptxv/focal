@@ -8,7 +8,7 @@ import sys
 import torch
 
 import focal
-from focal.ops import _decode_attn_contig_out, cuda_extension_available
+from focal.cuda_extension import cuda_extension_available
 
 MAX_ABS_TOL = 5e-2
 RMS_TOL = 5e-3
@@ -39,7 +39,7 @@ CSV_FIELDS = [
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--backend", choices=["ours", "torch_ref"], default="ours")
+    parser.add_argument("--backend", choices=["ours", "pytorch"], default="ours")
     parser.add_argument("--B", type=int, default=1)
     parser.add_argument("--Hq", type=int, default=32)
     parser.add_argument("--Hkv", type=int, default=8)
@@ -94,15 +94,14 @@ def make_inputs(args, dtype):
     return q, k, v, seq_lens, out
 
 
-def make_ours_runner(q, k, v, seq_lens, out, sm_scale):
+def make_ours_runner(q, k, v, seq_lens, sm_scale):
     def run():
-        # The public op is checked before timing; this path only avoids output allocation.
-        _decode_attn_contig_out(q, k, v, seq_lens, out, sm_scale)
+        return focal.decode_attn_contig(q, k, v, seq_lens, sm_scale)
 
     return run
 
 
-def make_torch_ref_runner(args, q, k, v, out, sm_scale):
+def make_pytorch_runner(args, q, k, v, out, sm_scale):
     group_size = args.Hq // args.Hkv
     hkv_indices = torch.arange(args.Hq, device="cuda", dtype=torch.int64) // group_size
 
@@ -145,9 +144,9 @@ def correctness_check(args, run, q, k, v, seq_lens, out, sm_scale):
             "Correctness check is required before timing; this benchmark currently checks L <= 2048."
         )
 
-    expected = focal.ref_decode_attn_contig(q, k, v, seq_lens, sm_scale)
+    expected = focal.pytorch_decode_attn_contig(q, k, v, seq_lens, sm_scale)
     if args.backend == "ours":
-        got = focal.decode_attn_contig(q, k, v, seq_lens, sm_scale)
+        got = run()
     else:
         run()
         got = out
@@ -244,7 +243,7 @@ def main():
     if args.backend == "ours" and not cuda_extension_available():
         raise SystemExit(
             "focal CUDA extension is unavailable. Build it with: "
-            "FOCAL_BUILD_CUDA=1 python -m pip install -e . --no-build-isolation"
+            "python -m pip install -e . --no-build-isolation"
         )
 
     dtype = dtype_from_name(args.dtype)
@@ -253,9 +252,9 @@ def main():
     sm_scale = 1.0 / math.sqrt(args.D)
 
     if args.backend == "ours":
-        run = make_ours_runner(q, k, v, seq_lens, out, sm_scale)
+        run = make_ours_runner(q, k, v, seq_lens, sm_scale)
     else:
-        run = make_torch_ref_runner(args, q, k, v, out, sm_scale)
+        run = make_pytorch_runner(args, q, k, v, out, sm_scale)
 
     max_abs_error, rms_error = correctness_check(args, run, q, k, v, seq_lens, out, sm_scale)
     enforce_correctness(max_abs_error, rms_error)
