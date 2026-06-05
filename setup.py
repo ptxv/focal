@@ -3,10 +3,10 @@ from pathlib import Path
 from setuptools import find_packages, setup
 
 
-ROOT = Path(__file__).parent.resolve()
+PROJECT_ROOT = Path(__file__).parent.resolve()
 
 
-def cuda_extensions():
+def cuda_extension_build_config():
     try:
         from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CUDA_HOME
     except Exception as exc:
@@ -20,12 +20,11 @@ def cuda_extensions():
             "Building focal requires a CUDA toolkit with nvcc; CUDA_HOME is not set"
         )
 
-    ext_modules = [
+    extension_modules = [
         CUDAExtension(
-            name="focal.cuda_native",
+            name="focal.contiguous_gqa_decode_attention_cuda",
             sources=[
-                str(ROOT / "csrc" / "bindings.cpp"),
-                str(ROOT / "csrc" / "decode_attn_contig.cu"),
+                str(PROJECT_ROOT / "focal" / "kernels" / "contiguous_gqa_decode_attention.cu"),
             ],
             extra_compile_args={
                 "cxx": ["-O3"],
@@ -33,10 +32,10 @@ def cuda_extensions():
             },
         )
     ]
-    return ext_modules, {"build_ext": BuildExtension}
+    return extension_modules, {"build_ext": BuildExtension}
 
 
-ext_modules, cmdclass = cuda_extensions()
+extension_modules, build_commands = cuda_extension_build_config()
 
 
 setup(
@@ -46,6 +45,6 @@ setup(
     packages=find_packages(),
     python_requires=">=3.10",
     install_requires=["torch"],
-    ext_modules=ext_modules,
-    cmdclass=cmdclass,
+    ext_modules=extension_modules,
+    cmdclass=build_commands,
 )

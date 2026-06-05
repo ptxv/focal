@@ -1,4 +1,13 @@
-from .decode_attention import decode_attn_contig
-from .references import pytorch_decode_attn_contig
+from .contiguous_gqa_decode_attention import (
+    contiguous_gqa_decode_attention,
+    cuda_extension_available,
+    pytorch_contiguous_gqa_decode_attention,
+    require_cuda_extension,
+)
 
-__all__ = ["decode_attn_contig", "pytorch_decode_attn_contig"]
+__all__ = [
+    "contiguous_gqa_decode_attention",
+    "cuda_extension_available",
+    "pytorch_contiguous_gqa_decode_attention",
+    "require_cuda_extension",
+]
