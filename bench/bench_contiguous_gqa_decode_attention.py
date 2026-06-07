@@ -3,7 +3,6 @@ import csv
 import math
 import os
 import statistics
-import sys
 
 import torch
 
@@ -36,7 +35,7 @@ CSV_FIELDS = [
 ]
 
 
-def parse_args():
+def parse_benchmark_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--backend", choices=["cuda", "pytorch"], default="cuda")
     parser.add_argument("--batch_size", type=int, default=1)
@@ -53,7 +52,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def dtype_from_name(name):
+def torch_dtype_from_cli_name(name):
     if name == "fp16":
         return torch.float16
     if name == "bf16":
@@ -63,12 +62,12 @@ def dtype_from_name(name):
     raise ValueError(f"unsupported dtype: {name}")
 
 
-def plot_mode_enabled(args):
+def plot_requested(args):
     return args.plot_csv is not None or args.plot_png is not None
 
 
-def validate_args(args):
-    if plot_mode_enabled(args):
+def check_benchmark_args(args):
+    if plot_requested(args):
         if args.plot_csv is None or args.plot_png is None:
             raise SystemExit("--plot_csv and --plot_png must be passed together")
         return
@@ -95,7 +94,7 @@ def validate_args(args):
         raise SystemExit("backend=cuda requires --dtype fp16 for CUDA kernel v1")
 
 
-def make_inputs(args, dtype):
+def make_attention_inputs(args, dtype):
     query = torch.randn((args.batch_size, args.query_heads, args.head_dim), device="cuda", dtype=dtype)
     key_cache = torch.randn((args.batch_size, args.key_value_heads, args.max_sequence_length, args.head_dim), device="cuda", dtype=dtype)
     value_cache = torch.randn((args.batch_size, args.key_value_heads, args.max_sequence_length, args.head_dim), device="cuda", dtype=dtype)
@@ -142,14 +141,14 @@ def make_pytorch_runner(args, query, key_cache, value_cache, output, softmax_sca
     return run
 
 
-def error_metrics(got, expected):
+def attention_error_metrics(got, expected):
     difference = got.float() - expected.float()
     absolute_difference = difference.abs()
     root_mean_square_error = torch.sqrt(torch.mean(difference * difference)).item()
     return absolute_difference.max().item(), root_mean_square_error
 
 
-def correctness_check(args, run, query, key_cache, value_cache, sequence_lengths, output, softmax_scale):
+def compare_runner_to_pytorch(args, run, query, key_cache, value_cache, sequence_lengths, output, softmax_scale):
     if args.max_sequence_length > 2048:
         raise SystemExit(
             "Correctness check is required before timing; this benchmark currently checks max_sequence_length <= 2048."
@@ -162,10 +161,10 @@ def correctness_check(args, run, query, key_cache, value_cache, sequence_lengths
         run()
         got = output
     torch.cuda.synchronize()
-    return error_metrics(got, expected)
+    return attention_error_metrics(got, expected)
 
 
-def enforce_correctness(max_absolute_error, root_mean_square_error):
+def fail_on_attention_mismatch(max_absolute_error, root_mean_square_error):
     if (
         max_absolute_error > MAX_ABSOLUTE_ERROR_TOLERANCE
         or root_mean_square_error > ROOT_MEAN_SQUARE_ERROR_TOLERANCE
@@ -177,7 +176,7 @@ def enforce_correctness(max_absolute_error, root_mean_square_error):
         )
 
 
-def time_runner(run, warmup, repeats):
+def time_attention_runner(run, warmup, repeats):
     for _ in range(warmup):
         run()
     torch.cuda.synchronize()
@@ -206,7 +205,7 @@ def percentile(sorted_values, p):
     return sorted_values[low] * (1.0 - weight) + sorted_values[high] * weight
 
 
-def summarize_times(times):
+def summarize_latency(times):
     ordered = sorted(times)
     return {
         "p50_us": percentile(ordered, 0.50),
@@ -217,7 +216,7 @@ def summarize_times(times):
     }
 
 
-def write_csv(path, benchmark_row):
+def write_benchmark_csv(path, benchmark_row):
     directory = os.path.dirname(path)
     if directory:
         os.makedirs(directory, exist_ok=True)
@@ -230,7 +229,7 @@ def write_csv(path, benchmark_row):
         writer.writerow(benchmark_row)
 
 
-def print_table(benchmark_row):
+def print_benchmark_table(benchmark_row):
     headers = ["backend", "dtype", "batch_size", "query_heads", "key_value_heads", "head_dim", "max_sequence_length", "p50_us", "p90_us", "mean_us"]
     display_cells = [
         benchmark_row["backend"],
@@ -249,7 +248,7 @@ def print_table(benchmark_row):
     print("  ".join(str(cell).rjust(w) for cell, w in zip(display_cells, widths)))
 
 
-def plot_csv(csv_path, png_path):
+def plot_benchmark_csv(csv_path, png_path):
     if not os.path.exists(csv_path):
         raise SystemExit(f"benchmark CSV does not exist: {csv_path}")
 
@@ -305,11 +304,11 @@ def plot_csv(csv_path, png_path):
 
 
 def main():
-    args = parse_args()
-    validate_args(args)
+    args = parse_benchmark_args()
+    check_benchmark_args(args)
 
-    if plot_mode_enabled(args):
-        plot_csv(args.plot_csv, args.plot_png)
+    if plot_requested(args):
+        plot_benchmark_csv(args.plot_csv, args.plot_png)
         return
 
     if not torch.cuda.is_available():
@@ -320,9 +319,9 @@ def main():
             "python -m pip install -e . --no-build-isolation"
         )
 
-    dtype = dtype_from_name(args.dtype)
+    dtype = torch_dtype_from_cli_name(args.dtype)
     torch.manual_seed(0)
-    query, key_cache, value_cache, sequence_lengths, output = make_inputs(args, dtype)
+    query, key_cache, value_cache, sequence_lengths, output = make_attention_inputs(args, dtype)
     softmax_scale = 1.0 / math.sqrt(args.head_dim)
 
     if args.backend == "cuda":
@@ -330,7 +329,7 @@ def main():
     else:
         run = make_pytorch_runner(args, query, key_cache, value_cache, output, softmax_scale)
 
-    max_absolute_error, root_mean_square_error = correctness_check(
+    max_absolute_error, root_mean_square_error = compare_runner_to_pytorch(
         args,
         run,
         query,
@@ -340,9 +339,9 @@ def main():
         output,
         softmax_scale,
     )
-    enforce_correctness(max_absolute_error, root_mean_square_error)
-    times = time_runner(run, args.warmup, args.repeats)
-    stats = summarize_times(times)
+    fail_on_attention_mismatch(max_absolute_error, root_mean_square_error)
+    times = time_attention_runner(run, args.warmup, args.repeats)
+    stats = summarize_latency(times)
 
     benchmark_row = {
         "backend": args.backend,
@@ -362,14 +361,10 @@ def main():
         **stats,
     }
 
-    print_table(benchmark_row)
+    print_benchmark_table(benchmark_row)
     if args.csv:
-        write_csv(args.csv, benchmark_row)
+        write_benchmark_csv(args.csv, benchmark_row)
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except RuntimeError as exc:
-        print(str(exc), file=sys.stderr)
-        raise SystemExit(1) from exc
+    main()

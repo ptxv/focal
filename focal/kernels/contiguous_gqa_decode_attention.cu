@@ -88,7 +88,7 @@ __global__ void contiguous_gqa_decode_attention_kernel(
 
     const bool invalid_sequence_length = sequence_length < 0 || sequence_length > max_sequence_length;
     if (invalid_sequence_length || sequence_length == 0) {
-        // Python validation rejects invalid lengths before launch; this keeps direct native calls bounded without a host sync.
+        // Python contract check rejects invalid lengths before launch; direct native calls still stay bounded.
         output[output_offset + head_dim_index] = __float2half(invalid_sequence_length ? CUDART_NAN_F : 0.0f);
         return;
     }

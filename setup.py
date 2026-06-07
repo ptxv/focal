@@ -9,7 +9,7 @@ PROJECT_ROOT = Path(__file__).parent.resolve()
 def cuda_extension_build_config():
     try:
         from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CUDA_HOME
-    except Exception as exc:
+    except ImportError as exc:
         raise RuntimeError(
             "Building focal requires torch in the build environment. "
             "Install torch first; if pip build isolation hides it, use --no-build-isolation."

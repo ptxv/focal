@@ -70,7 +70,7 @@ def check_sequence_lengths_values(sequence_lengths, max_sequence_length):
         raise ValueError(f"sequence_lengths values must be <= max_sequence_length={max_sequence_length}")
 
 
-def validate_contiguous_gqa_decode_attention_inputs(
+def check_contiguous_gqa_decode_attention_contract(
     query,
     key_cache,
     value_cache,
@@ -161,7 +161,7 @@ def validate_contiguous_gqa_decode_attention_inputs(
     return batch_size, query_heads, key_value_heads, max_sequence_length, head_dim
 
 
-def validate_contiguous_gqa_decode_attention_cuda_inputs(
+def check_contiguous_gqa_decode_attention_cuda_contract(
     query,
     key_cache,
     value_cache,
@@ -170,7 +170,7 @@ def validate_contiguous_gqa_decode_attention_cuda_inputs(
     check_lengths=True,
 ):
     batch_size, query_heads, key_value_heads, max_sequence_length, head_dim = (
-        validate_contiguous_gqa_decode_attention_inputs(
+        check_contiguous_gqa_decode_attention_contract(
             query,
             key_cache,
             value_cache,
@@ -223,7 +223,7 @@ def contiguous_gqa_decode_attention(
     softmax_scale=None,
 ):
     # Public CUDA path. no CPU fallback, so kernel failures stay obvious.
-    validate_contiguous_gqa_decode_attention_cuda_inputs(
+    check_contiguous_gqa_decode_attention_cuda_contract(
         query,
         key_cache,
         value_cache,
@@ -253,7 +253,7 @@ def pytorch_contiguous_gqa_decode_attention(
         key_value_heads,
         max_sequence_length,
         head_dim,
-    ) = validate_contiguous_gqa_decode_attention_inputs(
+    ) = check_contiguous_gqa_decode_attention_contract(
         query,
         key_cache,
         value_cache,

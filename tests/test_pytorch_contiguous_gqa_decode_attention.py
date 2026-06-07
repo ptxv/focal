@@ -206,7 +206,7 @@ def test_pytorch_contiguous_gqa_decode_attention_rejects_nonfinite_scale():
         ),
     ],
 )
-def test_pytorch_contiguous_gqa_decode_attention_validation_errors(
+def test_pytorch_contiguous_gqa_decode_attention_contract_errors(
     query,
     key_cache,
     value_cache,
