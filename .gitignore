@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+bench/results_*.jsonl
+scripts/sass_*.txt
