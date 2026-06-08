@@ -10,8 +10,9 @@
 
 namespace {
 
-constexpr int N_TILE = 64;
+constexpr int N_TILE = 16;
 constexpr int THREADS = 256;
+constexpr int COL_THREADS = THREADS / N_TILE;
 
 
 template <int M>
@@ -24,8 +25,8 @@ __global__ void w4a16_gemv_kernel(
     int K,
     int N) {
   const int tid = threadIdx.x;
-  const int col_local = tid >> 2;
-  const int lane4 = tid & 3;
+  const int col_local = tid / COL_THREADS;
+  const int lane = tid & (COL_THREADS - 1);
   const int n = blockIdx.x * N_TILE + col_local;
   const int words_per_row = K >> 3;
   const int groups_per_row = K >> 7;
@@ -39,14 +40,14 @@ __global__ void w4a16_gemv_kernel(
   const int w_base = n * words_per_row;
   const int group_base = n * groups_per_row;
 
-  // Each CTA owns 64 output columns. Four threads reduce one column over K.
+  // More CTAs keep small-N H100 launches from underfilling the SMs.
   for (int group = 0; group < groups_per_row; ++group) {
     const float scale = __half2float(scales[group_base + group]);
     const float zero = __half2float(zeros[group_base + group]);
-    const int k_begin = (group << 7) + lane4;
+    const int k_begin = (group << 7) + lane;
     const int k_end = (group + 1) << 7;
 
-    for (int k = k_begin; k < k_end; k += 4) {
+    for (int k = k_begin; k < k_end; k += COL_THREADS) {
       const uint32_t word = static_cast<uint32_t>(wq[w_base + (k >> 3)]);
       const int q = static_cast<int>((word >> (4 * (k & 7))) & 0xF);
       const float w = (static_cast<float>(q) - zero) * scale;
@@ -60,11 +61,13 @@ __global__ void w4a16_gemv_kernel(
 
 #pragma unroll
   for (int m = 0; m < M; ++m) {
-    acc[m] += __shfl_down_sync(0xffffffff, acc[m], 2, 4);
-    acc[m] += __shfl_down_sync(0xffffffff, acc[m], 1, 4);
+    acc[m] += __shfl_down_sync(0xffffffff, acc[m], 8, COL_THREADS);
+    acc[m] += __shfl_down_sync(0xffffffff, acc[m], 4, COL_THREADS);
+    acc[m] += __shfl_down_sync(0xffffffff, acc[m], 2, COL_THREADS);
+    acc[m] += __shfl_down_sync(0xffffffff, acc[m], 1, COL_THREADS);
   }
 
-  if (lane4 == 0) {
+  if (lane == 0) {
 #pragma unroll
     for (int m = 0; m < M; ++m) {
       y[m * N + n] = __float2bfloat16(acc[m]);
@@ -113,7 +116,7 @@ torch::Tensor w4a16_linear_cuda(
   TORCH_CHECK(K64 == 4096 || K64 == 8192, "unsupported K");
   TORCH_CHECK(N64 == 4096 || N64 == 8192 || N64 == 11008, "unsupported N");
   TORCH_CHECK(K64 % 128 == 0, "K must be divisible by 128");
-  TORCH_CHECK(N64 % N_TILE == 0, "N must be divisible by 64");
+  TORCH_CHECK(N64 % 64 == 0, "N must be divisible by 64");
   TORCH_CHECK(wq.size(1) == K64 / 8, "wq must have shape [N, K / 8]");
   TORCH_CHECK(scales.size(0) == N64 && scales.size(1) == K64 / 128,
               "scales must have shape [N, K / 128]");

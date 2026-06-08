@@ -4,4 +4,6 @@ __pycache__/
 build/
 dist/
 bench/results_*.jsonl
+bench/ncu_*.csv
+bench/sass_summary*.txt
 scripts/sass_*.txt

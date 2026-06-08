@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64", "wheel", "torch"]
+requires = ["setuptools>=64", "wheel", "torch", "pybind11"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,4 +7,4 @@ name = "focal-w4a16"
 version = "0.0.0"
 description = "Small-M CUDA W4A16 linear benchmark"
 requires-python = ">=3.10"
-dependencies = ["torch"]
+dependencies = ["torch", "pybind11"]

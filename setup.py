@@ -1,3 +1,4 @@
+import pybind11
 from setuptools import find_packages, setup
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 
@@ -13,6 +14,7 @@ setup(
                 "csrc/bindings.cpp",
                 "csrc/w4a16_gemv.cu",
             ],
+            include_dirs=[pybind11.get_include()],
             extra_compile_args={
                 "cxx": ["-O3"],
                 "nvcc": [
