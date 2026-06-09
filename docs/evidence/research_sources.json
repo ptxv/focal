@@ -1,0 +1,53 @@
+{
+  "observed_h100_modules": {
+    "bitsandbytes": false,
+    "vllm": false,
+    "tensorrt_llm": false,
+    "cutlass": false,
+    "marlin": false
+  },
+  "h100_feasibility_notes": [
+    "Marlin git clone worked on the instance.",
+    "Marlin README says it is not optimized for Hopper.",
+    "Marlin uses its own symmetric offline packing path.",
+    "vLLM, TensorRT-LLM, bitsandbytes, CUTLASS, and Marlin were not installed.",
+    "No third-party numeric comparison was kept."
+  ],
+  "sources": [
+    {
+      "name": "MARLIN",
+      "url": "https://github.com/IST-DASLab/marlin",
+      "used_for": "Closest FP16xINT4 LLM kernel reference."
+    },
+    {
+      "name": "MARLIN paper",
+      "url": "https://arxiv.org/abs/2408.11743",
+      "used_for": "Batch and end-to-end LLM speedup context."
+    },
+    {
+      "name": "TensorRT Edge-LLM Int4 Groupwise GEMM",
+      "url": "https://nvidia.github.io/TensorRT-Edge-LLM/cpp_api/kernels/int4GroupwiseGemm.html",
+      "used_for": "Small-M INT4 groupwise GEMV comparison."
+    },
+    {
+      "name": "TensorRT-LLM quantization docs",
+      "url": "https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/features/quantization.md",
+      "used_for": "W4A16 AWQ/GPTQ support on Hopper."
+    },
+    {
+      "name": "vLLM AWQ-Marlin docs",
+      "url": "https://docs.vllm.ai/en/v0.10.2/api/vllm/model_executor/layers/quantization/awq_marlin.html",
+      "used_for": "AWQ-Marlin packing and group-size context."
+    },
+    {
+      "name": "bitsandbytes Linear4bit docs",
+      "url": "https://huggingface.co/docs/bitsandbytes/v0.43.3/en/reference/nn/linear4bit",
+      "used_for": "Why NF4/FP4 Linear4bit is not contract-equivalent."
+    },
+    {
+      "name": "CUTLASS docs",
+      "url": "https://docs.nvidia.com/cutlass/4.3.3/index.html",
+      "used_for": "CUTLASS mixed-precision and int4 capability context."
+    }
+  ]
+}

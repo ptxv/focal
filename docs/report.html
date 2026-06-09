@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>focal-w4a16 H100 report</title>
+  <style>
+    :root {
+      color: #171717;
+      background: #fafafa;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    body {
+      margin: 0;
+      padding: 32px;
+    }
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+    h1, h2, h3 {
+      margin: 0;
+      line-height: 1.2;
+    }
+    h1 {
+      font-size: 30px;
+      margin-bottom: 8px;
+    }
+    h2 {
+      font-size: 20px;
+      margin-top: 34px;
+      margin-bottom: 12px;
+    }
+    h3 {
+      font-size: 15px;
+      margin-top: 18px;
+      margin-bottom: 8px;
+    }
+    p {
+      margin: 8px 0;
+      max-width: 860px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 22px;
+      background: #fff;
+      border: 1px solid #d9d9d9;
+    }
+    th, td {
+      padding: 9px 10px;
+      border-bottom: 1px solid #e7e7e7;
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+    }
+    th {
+      background: #f0f3f7;
+      font-weight: 650;
+    }
+    code {
+      background: #eef1f4;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    a {
+      color: #064f9e;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 18px 0;
+    }
+    .metric {
+      background: #fff;
+      border: 1px solid #d9d9d9;
+      padding: 14px;
+    }
+    .metric span {
+      display: block;
+      color: #5b6572;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    .metric strong {
+      font-size: 22px;
+    }
+    .bar-row {
+      display: grid;
+      grid-template-columns: 150px 1fr 72px;
+      align-items: center;
+      gap: 10px;
+      margin: 8px 0;
+      font-size: 13px;
+    }
+    .bar {
+      height: 18px;
+      background: #dfe8f4;
+      position: relative;
+    }
+    .bar div {
+      height: 18px;
+      background: #1768ac;
+    }
+    .note {
+      color: #4e5966;
+      font-size: 13px;
+    }
+    .callout {
+      background: #fff7e6;
+      border: 1px solid #e4c573;
+      padding: 12px;
+      margin: 12px 0;
+    }
+    @media (max-width: 760px) {
+      body { padding: 18px; }
+      .grid { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>focal-w4a16 H100 report</h1>
+  <p>Target: small-M W4A16 linear on one NVIDIA H100 80GB HBM3.</p>
+  <p>All numeric evidence is stored under <code>docs/evidence/</code>.</p>
+
+  <section class="grid">
+    <div class="metric">
+      <span>CUDA tests</span>
+      <strong>32 passed</strong>
+    </div>
+    <div class="metric">
+      <span>Core latency</span>
+      <strong>0.00884 ms</strong>
+    </div>
+    <div class="metric">
+      <span>Core speedup vs dequant</span>
+      <strong>51.12x</strong>
+    </div>
+    <div class="metric">
+      <span>Bundle speedup vs predequant</span>
+      <strong>2.82x</strong>
+    </div>
+  </section>
+
+  <h2>What Was Measured</h2>
+  <p>The sweep used 28 shapes.</p>
+  <p>Base shapes use K in 4096, 8192 and N in 4096, 8192, 11008.</p>
+  <p>Extra down-proj shapes use K=11008 and N=4096.</p>
+  <p>The reference computes <code>x.float() @ dequant(wq).T</code>, then casts to bf16.</p>
+  <p>TF32 was disabled. CUDA events measured benchmark latency.</p>
+  <p>NCU counters required <code>sudo -n ncu</code> on this instance.</p>
+
+  <h2>Correctness</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Check</th>
+        <th>Result</th>
+        <th>Evidence</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>CUDA test suite</td>
+        <td>32 passed</td>
+        <td><a href="evidence/summary.json">summary.json</a></td>
+      </tr>
+      <tr>
+        <td>Worst absolute error</td>
+        <td>0.125, threshold 0.25</td>
+        <td><a href="evidence/results_kept.jsonl">results_kept.jsonl</a></td>
+      </tr>
+      <tr>
+        <td>Worst relative error</td>
+        <td>0.007519, threshold 0.03</td>
+        <td><a href="evidence/results_kept.jsonl">results_kept.jsonl</a></td>
+      </tr>
+      <tr>
+        <td>New fake-data guard</td>
+        <td>Structured nibble-order test uses direct math.</td>
+        <td><code>tests/test_correctness.py</code></td>
+      </tr>
+      <tr>
+        <td>Model-shaped guard</td>
+        <td>Supported Llama-2-7B projections pass.</td>
+        <td><code>tests/test_decode_bundle.py</code></td>
+      </tr>
+      <tr>
+        <td>Unsupported path guard</td>
+        <td>Wide K=11008,N=11008 is rejected.</td>
+        <td><code>tests/test_decode_bundle.py</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Shape Sweep</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Shape</th>
+        <th>focal ms</th>
+        <th>dequant+matmul ms</th>
+        <th>predequant ms</th>
+        <th>speedup vs dequant</th>
+        <th>speedup vs predequant</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>M=1 K=4096 N=4096</td>
+        <td>0.00884</td>
+        <td>0.45171</td>
+        <td>0.03773</td>
+        <td>51.12x</td>
+        <td>4.27x</td>
+      </tr>
+      <tr>
+        <td>M=1 K=4096 N=11008</td>
+        <td>0.02038</td>
+        <td>1.11132</td>
+        <td>0.07942</td>
+        <td>54.53x</td>
+        <td>3.90x</td>
+      </tr>
+      <tr>
+        <td>M=1 K=11008 N=4096</td>
+        <td>0.01951</td>
+        <td>1.10184</td>
+        <td>0.07524</td>
+        <td>56.49x</td>
+        <td>3.86x</td>
+      </tr>
+      <tr>
+        <td>M=8 K=8192 N=11008</td>
+        <td>0.22124</td>
+        <td>2.22915</td>
+        <td>0.22276</td>
+        <td>10.08x</td>
+        <td>1.01x</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="bar-row">
+    <div>M1 4096x4096</div>
+    <div class="bar"><div style="width: 90%"></div></div>
+    <div>51.12x</div>
+  </div>
+  <div class="bar-row">
+    <div>M1 11008x4096</div>
+    <div class="bar"><div style="width: 100%"></div></div>
+    <div>56.49x</div>
+  </div>
+  <div class="bar-row">
+    <div>M1 4096x11008</div>
+    <div class="bar"><div style="width: 97%"></div></div>
+    <div>54.80x</div>
+  </div>
+  <div class="bar-row">
+    <div>M8 8192x11008</div>
+    <div class="bar"><div style="width: 18%"></div></div>
+    <div>10.08x</div>
+  </div>
+
+  <p>Across all 28 rows, speedup vs dequant+matmul ranges from 10.08x to 57.75x.</p>
+  <p>Speedup vs predequant matmul ranges from 1.01x to 4.27x.</p>
+
+  <h2>Repeated Timing</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Shape</th>
+        <th>focal median ms</th>
+        <th>dequant median ms</th>
+        <th>predequant median ms</th>
+        <th>speedup vs dequant</th>
+        <th>speedup vs predequant</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>M=1 K=4096 N=4096</td>
+        <td>0.00899</td>
+        <td>0.45420</td>
+        <td>0.03819</td>
+        <td>50.54x</td>
+        <td>4.25x</td>
+      </tr>
+      <tr>
+        <td>M=1 K=4096 N=11008</td>
+        <td>0.02028</td>
+        <td>1.11175</td>
+        <td>0.07907</td>
+        <td>54.82x</td>
+        <td>3.90x</td>
+      </tr>
+      <tr>
+        <td>M=1 K=11008 N=4096</td>
+        <td>0.01975</td>
+        <td>1.10497</td>
+        <td>0.07636</td>
+        <td>55.94x</td>
+        <td>3.87x</td>
+      </tr>
+      <tr>
+        <td>M=8 K=8192 N=11008</td>
+        <td>0.22124</td>
+        <td>2.23199</td>
+        <td>0.22467</td>
+        <td>10.09x</td>
+        <td>1.02x</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="note">Each repeated row used 7 samples, 30 warmups, and 120 timed iterations.</p>
+
+  <h2>Model-Shaped Demo</h2>
+  <p>The demo is not a full model. That is deliberate.</p>
+  <p>A full Llama-2-7B run would fit on H100, but it would not be fair yet.</p>
+  <p>The down projection is now included.</p>
+  <p>Third-party model paths were not installed or integrated.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Bundle</th>
+        <th>Included layers</th>
+        <th>Unsupported layer</th>
+        <th>focal median ms</th>
+        <th>predequant median ms</th>
+        <th>speedup</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Llama-2-7B decode projections</td>
+        <td>q, k, v, o, gate, up, down</td>
+        <td>none</td>
+        <td>0.13827</td>
+        <td>0.39014</td>
+        <td>2.82x</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Against dequant+matmul, the same bundle is 37.16x faster.</p>
+  <p>Evidence: <a href="evidence/decode_bundle_kept.json">decode_bundle_kept.json</a>.</p>
+
+  <h2>Profiler Evidence</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Shape</th>
+        <th>NCU duration</th>
+        <th>memory throughput</th>
+        <th>DRAM throughput</th>
+        <th>SM throughput</th>
+        <th>active warps</th>
+        <th>registers/thread</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>M=1 K=4096 N=4096</td>
+        <td>15,840 ns</td>
+        <td>39.79%</td>
+        <td>16.85%</td>
+        <td>33.83%</td>
+        <td>21.96%</td>
+        <td>31</td>
+      </tr>
+      <tr>
+        <td>M=1 K=11008 N=4096</td>
+        <td>35,552 ns</td>
+        <td>48.01%</td>
+        <td>20.29%</td>
+        <td>40.03%</td>
+        <td>23.15%</td>
+        <td>31</td>
+      </tr>
+      <tr>
+        <td>M=8 K=8192 N=11008</td>
+        <td>275,872 ns</td>
+        <td>83.21%</td>
+        <td>5.45%</td>
+        <td>41.81%</td>
+        <td>40.52%</td>
+        <td>56</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>NCU duration is profiler duration. Use benchmark JSON for latency claims.</p>
+  <p>Evidence: <a href="evidence/ncu_m1_4096_4096_final.csv">core NCU</a>, <a href="evidence/ncu_m1_11008_4096_kept.csv">down-proj NCU</a>, and <a href="evidence/ncu_m8_8192_11008_final.csv">large-shape NCU</a>.</p>
+
+  <h2>Comparable Kernels</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Library or kernel</th>
+        <th>Research finding</th>
+        <th>H100 status</th>
+        <th>Decision</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>MARLIN</td>
+        <td>Closest FP16xINT4 LLM kernel. Targets group size 128.</td>
+        <td>Clone worked. Package was not installed.</td>
+        <td>No number. Packing differs and README excludes Hopper tuning.</td>
+      </tr>
+      <tr>
+        <td>vLLM AWQ-Marlin</td>
+        <td>Uses packed int32 qweight, qzeros, and scales.</td>
+        <td>Not installed.</td>
+        <td>No number. Requires model executor integration.</td>
+      </tr>
+      <tr>
+        <td>TensorRT-LLM</td>
+        <td>Documents W4A16 AWQ/GPTQ support on Hopper.</td>
+        <td>Not installed.</td>
+        <td>No number. Requires engine build and model format.</td>
+      </tr>
+      <tr>
+        <td>TensorRT Edge-LLM GEMV</td>
+        <td>Documents INT4 groupwise GEMV for M=1..4.</td>
+        <td>Not installed.</td>
+        <td>No number. Contract differs from this repo.</td>
+      </tr>
+      <tr>
+        <td>bitsandbytes Linear4bit</td>
+        <td>Implements FP4/NF4 blockwise layers.</td>
+        <td>Not installed.</td>
+        <td>No number. Quantization is not equivalent.</td>
+      </tr>
+      <tr>
+        <td>CUTLASS</td>
+        <td>Supports int4 types and GEMM building blocks.</td>
+        <td>Not installed as Python package.</td>
+        <td>No number. It is not a drop-in W4A16 layer.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Research sources and module checks are in <a href="evidence/research_sources.json">research_sources.json</a>.</p>
+
+  <h2>Optimization Findings</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Idea</th>
+        <th>Result</th>
+        <th>Evidence</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>One lane owns one packed word.</td>
+        <td>Kept. It removes duplicate packed-weight loads.</td>
+        <td><code>csrc/w4a16_gemv.cu</code></td>
+      </tr>
+      <tr>
+        <td>Precompute scaled zero.</td>
+        <td>Kept. SASS shows FFMA dequantization.</td>
+        <td><a href="evidence/sass_summary_final.txt">sass_summary_final.txt</a></td>
+      </tr>
+      <tr>
+        <td>Symmetric zero-point fast path.</td>
+        <td>Rejected. It slowed M=1 core and down-proj.</td>
+        <td><a href="evidence/results_symmetric.jsonl">results_symmetric.jsonl</a></td>
+      </tr>
+      <tr>
+        <td>Warp-shuffle activation broadcast.</td>
+        <td>Rejected. It slowed the core shape.</td>
+        <td><a href="evidence/rejected_shuffle.jsonl">rejected_shuffle.jsonl</a></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Next Useful Work</h2>
+  <div class="callout">
+    <p>Do not claim full model latency yet.</p>
+    <p>The repo still lacks real checkpoint quantization.</p>
+  </div>
+  <p>Do not keep the tested symmetric-zero path.</p>
+  <p>Try a swizzled weight layout. It could improve coalescing across N tiles.</p>
+  <p>Try M-specific N_TILE autotuning. The large M=8 case is memory-heavy.</p>
+  <p>Integrate one real packing format before comparing against Marlin or vLLM.</p>
+
+  <h2>Evidence Files</h2>
+  <ul>
+    <li><a href="evidence/summary.json">summary.json</a></li>
+    <li><a href="evidence/results_kept.jsonl">results_kept.jsonl</a></li>
+    <li><a href="evidence/decode_bundle_kept.json">decode_bundle_kept.json</a></li>
+    <li><a href="evidence/results_symmetric.jsonl">results_symmetric.jsonl</a></li>
+    <li><a href="evidence/ncu_m1_4096_4096_final.csv">ncu_m1_4096_4096_final.csv</a></li>
+    <li><a href="evidence/ncu_m1_11008_4096_kept.csv">ncu_m1_11008_4096_kept.csv</a></li>
+    <li><a href="evidence/ncu_m8_8192_11008_final.csv">ncu_m8_8192_11008_final.csv</a></li>
+    <li><a href="evidence/sass_summary_final.txt">sass_summary_final.txt</a></li>
+    <li><a href="evidence/rejected_shuffle.jsonl">rejected_shuffle.jsonl</a></li>
+    <li><a href="evidence/research_sources.json">research_sources.json</a></li>
+  </ul>
+</main>
+</body>
+</html>

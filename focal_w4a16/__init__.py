@@ -6,6 +6,12 @@ import torch
 SUPPORTED_M = (1, 2, 4, 8)
 SUPPORTED_K = (4096, 8192)
 SUPPORTED_N = (4096, 8192, 11008)
+SUPPORTED_EXTRA_SHAPES = (
+    (1, 11008, 4096),
+    (2, 11008, 4096),
+    (4, 11008, 4096),
+    (8, 11008, 4096),
+)
 extension = None
 
 
@@ -15,6 +21,7 @@ def w4a16_linear(
     scales: torch.Tensor,
     zeros: torch.Tensor,
 ) -> torch.Tensor:
+    # Import only when the CUDA kernel is called.
     global extension
     if extension is None:
         extension = import_module("focal_w4a16._C")
@@ -39,6 +46,7 @@ def pack_int4_weight(w_q_uint8: torch.Tensor) -> torch.Tensor:
     if k % 8 != 0:
         raise ValueError("K must be divisible by 8")
 
+    # Packing stays on CUDA tensors.
     q = w_q_uint8.view(n, k // 8, 8)
     packed = torch.zeros((n, k // 8), device=w_q_uint8.device, dtype=torch.int32)
     for i in range(8):
@@ -74,6 +82,7 @@ def dequant_ref(
     if zeros.shape != (n, K // 128):
         raise ValueError("zeros must have shape [N, K / 128]")
 
+    # Repeat group scales along K.
     shifts = torch.arange(8, device=wq.device, dtype=torch.int32) * 4
     q = ((wq.view(n, k_words, 1) >> shifts.view(1, 1, 8)) & 0xF).to(torch.float32)
     q = q.reshape(n, K)
@@ -90,8 +99,8 @@ def random_case(
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     if M not in SUPPORTED_M:
         raise ValueError(f"unsupported M: {M}")
-    if K not in SUPPORTED_K:
-        raise ValueError(f"unsupported K: {K}")
+    if K not in SUPPORTED_K and (M, K, N) not in SUPPORTED_EXTRA_SHAPES:
+        raise ValueError(f"unsupported shape: M={M} K={K} N={N}")
     if N not in SUPPORTED_N:
         raise ValueError(f"unsupported N: {N}")
     if not torch.cuda.is_available():
@@ -102,6 +111,7 @@ def random_case(
     x = torch.randn((M, K), device="cuda", dtype=torch.bfloat16, generator=gen)
     q = torch.randint(0, 16, (N, K), device="cuda", dtype=torch.uint8, generator=gen)
     wq = pack_int4_weight(q)
+    # Random scales exercise signed dequant offsets.
     scales = 0.005 + 0.045 * torch.rand(
         (N, K // 128), device="cuda", dtype=torch.float16, generator=gen
     )
@@ -115,6 +125,7 @@ __all__ = [
     "SUPPORTED_K",
     "SUPPORTED_M",
     "SUPPORTED_N",
+    "SUPPORTED_EXTRA_SHAPES",
     "dequant_ref",
     "pack_int4_weight",
     "random_case",

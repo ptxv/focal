@@ -9,6 +9,12 @@ import focal_w4a16
 
 MAX_ABS_ERR = 0.25
 MAX_REL_ERR = 0.03
+SHAPES = [
+    (M, K, N)
+    for M in focal_w4a16.SUPPORTED_M
+    for K in focal_w4a16.SUPPORTED_K
+    for N in focal_w4a16.SUPPORTED_N
+] + list(focal_w4a16.SUPPORTED_EXTRA_SHAPES)
 
 
 def max_errors(y, ref):
@@ -34,11 +40,13 @@ def time_cuda(fn, warmup, iters):
 
 
 def baseline_dequant_matmul(x, wq, scales, zeros, K):
+    # Baseline includes dequantization every iteration.
     w_deq = focal_w4a16.dequant_ref(wq, scales, zeros, K)
     return (x.float() @ w_deq.T).to(torch.bfloat16)
 
 
 def baseline_predequant_matmul(x, w_deq):
+    # Predequant baseline isolates matmul cost.
     return (x.float() @ w_deq.T).to(torch.bfloat16)
 
 
@@ -71,9 +79,7 @@ def main():
     print("-" * len(header))
 
     with jsonl_path.open("w", encoding="utf-8") as f:
-        for M in [1, 2, 4, 8]:
-            for K in [4096, 8192]:
-                for N in [4096, 8192, 11008]:
+        for M, K, N in SHAPES:
                     x, wq, scales, zeros = focal_w4a16.random_case(M, K, N, seed=1234)
 
                     y = focal_w4a16.w4a16_linear(x, wq, scales, zeros)
@@ -113,6 +119,7 @@ def main():
                         "max_abs_err_threshold": MAX_ABS_ERR,
                         "max_rel_err_threshold": MAX_REL_ERR,
                     }
+                    # JSONL preserves exact benchmark rows.
                     f.write(json.dumps(result) + "\n")
                     f.flush()
 

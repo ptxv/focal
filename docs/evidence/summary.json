@@ -1,0 +1,92 @@
+{
+  "hardware": "NVIDIA H100 80GB HBM3",
+  "tests": {
+    "command": "python3 -m pytest -q -s",
+    "passed": 32
+  },
+  "shape_sweep": {
+    "artifact": "results_kept.jsonl",
+    "rows": 28,
+    "min_speedup_vs_dequant_matmul": 10.075800265310326,
+    "max_speedup_vs_dequant_matmul": 57.75416622707419,
+    "min_speedup_vs_predequant_matmul": 1.0068819984607622,
+    "max_speedup_vs_predequant_matmul": 4.269563710019567,
+    "max_abs_err": 0.125,
+    "max_rel_err": 0.007518797181546688
+  },
+  "core_shape": {
+    "M": 1,
+    "K": 4096,
+    "N": 4096,
+    "focal_ms": 0.00883679986000061,
+    "dequant_matmul_ms": 0.4517113494873047,
+    "predequant_matmul_ms": 0.0377292799949646,
+    "speedup_vs_dequant_matmul": 51.11707367414265,
+    "speedup_vs_predequant_matmul": 4.269563710019567
+  },
+  "down_projection": {
+    "M": 1,
+    "K": 11008,
+    "N": 4096,
+    "focal_ms": 0.01950592041015625,
+    "dequant_matmul_ms": 1.1018401336669923,
+    "predequant_matmul_ms": 0.07524223804473877,
+    "speedup_vs_dequant_matmul": 56.48747203404416,
+    "speedup_vs_predequant_matmul": 3.8574051602077697
+  },
+  "largest_shape": {
+    "M": 8,
+    "K": 8192,
+    "N": 11008,
+    "focal_ms": 0.22123807907104492,
+    "dequant_matmul_ms": 2.229150695800781,
+    "predequant_matmul_ms": 0.22276063919067382,
+    "speedup_vs_dequant_matmul": 10.075800265310326,
+    "speedup_vs_predequant_matmul": 1.0068819984607622
+  },
+  "decode_bundle": {
+    "artifact": "decode_bundle_kept.json",
+    "name": "llama2_7b_supported_decode_projection_bundle",
+    "focal_median_ms": 0.1382736047108968,
+    "dequant_matmul_median_ms": 5.1382298787434895,
+    "predequant_matmul_median_ms": 0.3901410738627116,
+    "speedup_vs_dequant_matmul": 37.159875085968345,
+    "speedup_vs_predequant_matmul": 2.821515174052348,
+    "unsupported_layer": null
+  },
+  "ncu": [
+    {
+      "artifact": "ncu_m1_4096_4096_final.csv",
+      "shape": "M=1 K=4096 N=4096",
+      "duration_ns": 15840,
+      "cycles": 25191.08,
+      "memory_throughput_pct": 39.79,
+      "dram_throughput_pct": 16.85,
+      "sm_throughput_pct": 33.83,
+      "active_warps_pct": 21.96,
+      "registers_per_thread": 31
+    },
+    {
+      "artifact": "ncu_m1_11008_4096_kept.csv",
+      "shape": "M=1 K=11008 N=4096",
+      "duration_ns": 35552,
+      "cycles": 56347.21,
+      "memory_throughput_pct": 48.01,
+      "dram_throughput_pct": 20.29,
+      "sm_throughput_pct": 40.03,
+      "active_warps_pct": 23.15,
+      "registers_per_thread": 31
+    },
+    {
+      "artifact": "ncu_m8_8192_11008_final.csv",
+      "shape": "M=8 K=8192 N=11008",
+      "duration_ns": 275872,
+      "cycles": 438224.47,
+      "memory_throughput_pct": 83.21,
+      "dram_throughput_pct": 5.45,
+      "sm_throughput_pct": 41.81,
+      "active_warps_pct": 40.52,
+      "registers_per_thread": 56
+    }
+  ]
+}

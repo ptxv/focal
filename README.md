@@ -32,6 +32,12 @@ Optional benchmark knobs:
 python bench/bench_w4a16.py --warmup 50 --iters 200 --jsonl bench/results.jsonl
 ```
 
+## H100 Report
+
+Open `docs/report.html` for the current H100 evidence summary.
+
+The raw benchmark, NCU, SASS, and research files live in `docs/evidence/`.
+
 ## Shape Contract
 
 The Python API is:
@@ -53,6 +59,7 @@ Supported MVP shapes:
 - `M in {1, 2, 4, 8}`
 - `K in {4096, 8192}`
 - `N in {4096, 8192, 11008}`
+- Extra down-proj shape: `K = 11008, N = 4096`
 - `K % 128 == 0`
 - `N % 64 == 0`
 
